@@ -1,1 +1,28 @@
- 
+# AWS RDS EZ0320 서버 연결 정보
+# 실제 사용 시 .env 파일로 복사하고 비밀번호를 입력하세요
+
+DB_HOST=database-1.c1iymg62ikbr.us-east-2.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=newspaper_db
+DB_USER=EZ0320
+DB_PASSWORD=your_password_here
+
+# 크롤링 설정
+CRAWL_INTERVAL=3600  # 1시간마다 크롤링
+MAX_ARTICLES_PER_SOURCE=50
+REQUEST_TIMEOUT=30
+RETRY_ATTEMPTS=3
+
+# 로깅 설정
+LOG_LEVEL=INFO
+LOG_FILE=logs/crawler.log
+
+# 스케줄러 설정
+RSS_COLLECTION_INTERVAL=60
+WEB_CRAWLING_INTERVAL=120
+MAX_CONCURRENT_JOBS=5
+
+# AWS 설정 (선택사항)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key 
