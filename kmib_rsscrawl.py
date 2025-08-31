@@ -59,7 +59,7 @@ DEFAULT_RSS_URLS: List[str] = [
     'https://www.kmib.co.kr/rss/data/kmibChrRss.xml'       # 더미션
 ]
 
-# 카테고리별 한글명 매핑
+# 카테고리별 한글명 매핑 (국민일보 RSS용)
 RSS_CATEGORY_MAP = {
     'kmibEcoRss.xml': '경제',
     'kmibPolRss.xml': '정치',

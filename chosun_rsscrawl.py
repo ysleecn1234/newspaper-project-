@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 RSS 기반 뉴스 기사 크롤러
- - 국민일보 RSS 피드를 파싱하여 기사 정보를 추출하고 DB에 저장
+ - 조선일보 RSS 피드를 파싱하여 기사 정보를 추출하고 DB에 저장
  - 입력: RSS URL 또는 RSS URL 목록 파일
  - 출력: 표준출력(JSON Lines) 또는 --out 파일(JSON Lines)
- - 옵션: --save-db 사용 시 DB 저장(kmib_database_manager.db_manager 활용)
+ - 옵션: --save-db 사용 시 DB 저장(chosun_database_manager.db_manager 활용)
 """
 
 import argparse
@@ -33,7 +33,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('kmib_rss_crawler.log', encoding='utf-8', mode='w'),
+        logging.FileHandler('chosun_rss_crawler.log', encoding='utf-8', mode='w'),
         logging.StreamHandler()
     ]
 )
@@ -304,7 +304,7 @@ class RSSArticleCrawler:
             'title': title,
             'content': description,
             'url': link,
-            'source': '국민일보',
+            'source': '조선일보',
             'author': author,
             'published_date': pub_date,
             'categories': [category_name] if category_name else [],
@@ -431,7 +431,7 @@ def _load_rss_urls(args: argparse.Namespace) -> List[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='국민일보 RSS 피드 크롤러')
+    parser = argparse.ArgumentParser(description='조선일보 RSS 피드 크롤러')
     parser.add_argument('--rss-url', action='append', help='크롤링할 RSS URL (여러 번 지정 가능)')
     parser.add_argument('--rss-file', type=str, help='RSS URL 목록 파일 경로(줄바꿈 구분)')
     parser.add_argument('--out', type=str, help='결과 저장 파일 경로(JSON Lines)')
@@ -465,7 +465,7 @@ def main():
     
     # 입력된 URL이 없으면 기본 RSS URL 사용
     if not rss_urls:
-        logger.info('입력된 RSS URL이 없어 기본 국민일보 RSS URL로 실행합니다.')
+        logger.info('입력된 RSS URL이 없어 기본 조선일보 RSS URL로 실행합니다.')
         rss_urls = DEFAULT_RSS_URLS
 
     # RSS 피드 크롤링 실행
