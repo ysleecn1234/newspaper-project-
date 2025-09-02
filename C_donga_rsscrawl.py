@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 RSS 기반 뉴스 기사 크롤러
- - 조선일보 RSS 피드를 파싱하여 기사 정보를 추출하고 DB에 저장
+ - 동아일보 RSS 피드를 파싱하여 기사 정보를 추출하고 DB에 저장
  - 입력: RSS URL 또는 RSS URL 목록 파일
  - 출력: 표준출력(JSON Lines) 또는 --out 파일(JSON Lines)
- - 옵션: --save-db 사용 시 DB 저장(chosun_database_manager.db_manager 활용)
+ - 옵션: --save-db 사용 시 DB 저장(donga_database_manager.db_manager 활용)
 """
 
 import argparse
@@ -23,7 +23,7 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from chosun_database_manager import db_manager
+    from C_donga_database_manager import db_manager
 except Exception:
     db_manager = None  # DB가 없어도 동작 가능하게 처리
 
@@ -33,7 +33,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('chosun_rss_crawler.log', encoding='utf-8', mode='w'),
+        logging.FileHandler('donga_rss_crawler.log', encoding='utf-8', mode='w'),
         logging.StreamHandler()
     ]
 )
@@ -43,28 +43,46 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-# 조선일보 RSS URL 목록
+# 동아일보 RSS URL 목록
 DEFAULT_RSS_URLS: List[str] = [
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml', # 정치
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/economy/?outputType=xml', # 경제
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/national/?outputType=xml', # 사회
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/international/?outputType=xml', # 국제
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/culture-life/?outputType=xml', # 문화/라이프
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/opinion/?outputType=xml', # 오피니언
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml', # 스포츠
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/entertainments/?outputType=xml', # 연예
+    'https://rss.donga.com/total.xml', #전체 기사
+    'https://rss.donga.com/politics.xml', #정치
+    'https://rss.donga.com/national.xml', #사회(국내)
+    'https://rss.donga.com/economy.xml', #경제
+    'https://rss.donga.com/international.xml', #국제
+    'https://rss.donga.com/editorials.xml', #사설/칼럼
+    'https://rss.donga.com/science.xml', #의학/과학
+    'https://rss.donga.com/culture.xml', #문화/연예
+    'https://rss.donga.com/sports.xml', #스포츠
+    'https://rss.donga.com/inmul.xml', #사람속으로
+    'https://rss.donga.com/health.xml', #건강
+    'https://rss.donga.com/leisure.xml', #레저
+    'https://rss.donga.com/book.xml', #도서
+    'https://rss.donga.com/show.xml', #공연
+    'https://rss.donga.com/woman.xml', #여성
+    'https://rss.donga.com/travel.xml', #여행
+    'https://rss.donga.com/lifeinfo.xml' #생활정보
 ]
 
-# 카테고리별 한글명 매핑 (조선일보 RSS용)
+# 카테고리별 한글명 매핑 (동아일보 RSS용)
 RSS_CATEGORY_MAP = {
+    'total': '전체 기사',
     'politics': '정치',
-    'economy': '경제',
     'national': '사회',
+    'economy': '경제',
     'international': '국제',
-    'culture-life': '문화/라이프',
-    'opinion': '오피니언',
+    'editorials': '사설/칼럼',
+    'science': '의학/과학',
+    'culture': '문화/연예',
     'sports': '스포츠',
-    'entertainments': '연예'
+    'inmul': '사람속으로',
+    'health': '건강',
+    'leisure': '레저',
+    'book': '도서',
+    'show': '공연',
+    'woman': '여성',
+    'travel': '여행',
+    'lifeinfo': '생활정보'
 }
 
 
@@ -304,7 +322,7 @@ class RSSArticleCrawler:
             'title': title,
             'content': description,
             'url': link,
-            'source': '조선일보',
+            'source': '동아일보',
             'author': author,
             'published_date': pub_date,
             'categories': [category_name] if category_name else [],
@@ -346,8 +364,13 @@ class RSSArticleCrawler:
 
     def _extract_category_from_url(self, rss_url: str) -> Optional[str]:
         """RSS URL에서 카테고리명 추출"""
+        # 동아일보 RSS URL에서 카테고리 추출
+        # 예: https://rss.donga.com/politics.xml -> politics
         filename = os.path.basename(rss_url)
-        return RSS_CATEGORY_MAP.get(filename)
+        if filename.endswith('.xml'):
+            category = filename[:-4]  # .xml 확장자 제거
+            return RSS_CATEGORY_MAP.get(category)
+        return None
 
     def crawl_rss_feed(self, rss_url: str, save_db: bool = False) -> List[Dict[str, Any]]:
         """단일 RSS 피드를 크롤링"""
@@ -431,7 +454,7 @@ def _load_rss_urls(args: argparse.Namespace) -> List[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='조선일보 RSS 피드 크롤러')
+    parser = argparse.ArgumentParser(description='동아일보 RSS 피드 크롤러')
     parser.add_argument('--rss-url', action='append', help='크롤링할 RSS URL (여러 번 지정 가능)')
     parser.add_argument('--rss-file', type=str, help='RSS URL 목록 파일 경로(줄바꿈 구분)')
     parser.add_argument('--out', type=str, help='결과 저장 파일 경로(JSON Lines)')
@@ -465,7 +488,7 @@ def main():
     
     # 입력된 URL이 없으면 기본 RSS URL 사용
     if not rss_urls:
-        logger.info('입력된 RSS URL이 없어 기본 조선일보 RSS URL로 실행합니다.')
+        logger.info('입력된 RSS URL이 없어 기본 동아일보 RSS URL로 실행합니다.')
         rss_urls = DEFAULT_RSS_URLS
 
     # RSS 피드 크롤링 실행

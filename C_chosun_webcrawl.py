@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-URL 기반 뉴스 기사 크롤러 (동아일보 전용)
- - 동아일보 기사 페이지를 크롤링하도록 특화된 셀렉터/패턴 반영
+URL 기반 뉴스 기사 크롤러
+ - 조선일보 기사 페이지를 크롤링하도록 특화된 셀렉터/패턴 반영
  - 입력: 단일 URL 또는 URL 목록 파일
  - 출력: 표준출력(JSON Lines) 또는 --out 파일(JSON Lines)
- - 옵션: --save-db 사용 시 DB 저장(donga_database_manager.db_manager 활용)
+ - 옵션: --save-db 사용 시 DB 저장(chosun_database_manager.db_manager 활용)
 """
 
 import argparse
@@ -22,7 +22,7 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from donga_database_manager import db_manager
+    from C_chosun_database_manager import db_manager
 except Exception:
     db_manager = None  # DB가 없어도 동작 가능하게 처리
 
@@ -32,45 +32,43 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('donga_url_crawler.log', encoding='utf-8'),
+        logging.FileHandler('chosun_url_crawler.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 
-# 동아일보 기본 URL 목록 (인자를 주지 않으면 이 목록을 사용)
+# 조선일보 기본 URL 목록 (인자를 주지 않으면 이 목록을 사용)
 DEFAULT_URLS: List[str] = [
     # 필요 시 아래 URL을 원하는 기사 URL로 변경하세요
-    'https://www.donga.com/',
+    'https://www.chosun.com/',
 ]
 
 # 카테고리 하드코딩 입력 (인자 없으면 이 목록을 사용)
 DEFAULT_CATEGORY_URLS: List[str] = [
-    'https://www.donga.com/news/Opinion', # 오피니언
-    'https://www.donga.com/news/Politics', # 정치
-    'https://www.donga.com/news/Economy', # 경제
-    'https://www.donga.com/news/Inter', #국제
-    'https://www.donga.com/news/Society', #사회
-    'https://www.donga.com/news/Culture', #문화
-    'https://www.donga.com/news/Entertainment', #연예
-    'https://www.donga.com/news/Sports', #스포츠
-    'https://www.donga.com/news/Health', #헬스동아
-    'https://www.donga.com/news/TrendNews/daily' #트렌드뉴스
+    'https://www.chosun.com/economy/', # 경제
+    'https://www.chosun.com/opinion/', # 오피니언
+    'https://www.chosun.com/politics/', # 정치
+    'https://www.chosun.com/national/', # 사회
+    'https://www.chosun.com/international/', # 국제
+    'https://www.chosun.com/medical/', # 건강
+    'https://www.chosun.com/investment/', # 제테크
+    'https://www.chosun.com/sports/', # 스포츠
+    'https://www.chosun.com/culture-style/', # 문화/연예
 ]
 
-# 카테고리별 한글명 매핑 (동아일보)
+# 카테고리별 한글명 매핑 (조선일보)
 CATEGORY_MAP = {
-    'https://www.donga.com/news/Opinion': '오피니언',
-    'https://www.donga.com/news/Politics': '정치',
-    'https://www.donga.com/news/Economy': '경제',
-    'https://www.donga.com/news/Inter': '국제',
-    'https://www.donga.com/news/Society': '사회',
-    'https://www.donga.com/news/Culture': '문화',
-    'https://www.donga.com/news/Entertainment': '연예',
-    'https://www.donga.com/news/Sports': '스포츠',
-    'https://www.donga.com/news/Health': '헬스동아',
-    'https://www.donga.com/news/TrendNews/daily': '트렌드뉴스'
+    'https://www.chosun.com/economy/': '경제',
+    'https://www.chosun.com/opinion/': '오피니언',
+    'https://www.chosun.com/politics/': '정치',
+    'https://www.chosun.com/national/': '사회',
+    'https://www.chosun.com/international/': '국제',
+    'https://www.chosun.com/medical/': '건강',
+    'https://www.chosun.com/investment/': '제테크',
+    'https://www.chosun.com/sports/': '스포츠',
+    'https://www.chosun.com/culture-style/': '문화/연예'
 }
 
 # 카테고리 하드코딩시 최대 탐색 페이지 수
@@ -78,7 +76,7 @@ DEFAULT_CATEGORY_PAGES: int = 1
 
 
 class UrlArticleCrawler:
-    """동아일보 URL 기사 크롤러"""
+    """일반 URL 기사 크롤러 (요청/파싱 로직은 sisaon 크롤러 스타일 참고)"""
 
     def __init__(self, timeout: int = 15, max_retries: int = 3, request_delay: float = 0.8):
         self.timeout = timeout
@@ -148,37 +146,33 @@ class UrlArticleCrawler:
     @staticmethod
     def _korean_source_from_domain(netloc: str) -> str:
         mapping = {
-            'www.donga.com': '동아일보',
-            'donga.com': '동아일보',
-            'news.donga.com': '동아일보',
+            'www.chosun.com': '조선일보',
+            'chosun.com': '조선일보',
+            'news.chosun.com': '조선일보',
             'www.sisaon.co.kr': '시사오늘',
             'sisaon.co.kr': '시사오늘',
         }
         return mapping.get(netloc.lower(), netloc)
 
     def _extract_title(self, soup: BeautifulSoup) -> Optional[str]:
-        # 동아일보 특화 셀렉터
         selectors = [
             'meta[property="og:title"]',
             'meta[name="twitter:title"]',
-            '.article_title',  # 동아일보 기사 제목
-            '.news_title',     # 동아일보 뉴스 제목
-            '.title',          # 일반 제목
-            'h1',              # H1 태그
         ]
-        
         for sel in selectors:
             tag = soup.select_one(sel)
             if tag and tag.get('content'):
                 title = self._clean_text(tag['content'])
                 if 5 < len(title) < 200:
                     return title
-            elif tag:
+
+        for sel in ['h1', '.article-title', '.news-title', '.title']:
+            tag = soup.select_one(sel)
+            if tag:
                 title = self._clean_text(tag.get_text())
                 if 5 < len(title) < 200:
                     return title
 
-        # title 태그에서 추출
         tag = soup.find('title')
         if tag:
             title = self._clean_text(tag.get_text())
@@ -239,17 +233,27 @@ class UrlArticleCrawler:
                 if 2 <= len(author) <= 15 and re.search(r'[가-힣]', author):
                     return author
 
-        # 2) 동아일보 특화 셀렉터
+        # 2) mailto 기반 추정
+        for a in soup.select('a[href^="mailto:"]'):
+            parent_text = a.parent.get_text(' ', strip=True) if a.parent else ''
+            text = a.get_text(' ', strip=True)
+            blob = ' '.join([parent_text, text])
+            m = re.search(r'([가-힣]{2,4})\s*기자', blob)
+            if m:
+                name = m.group(1)
+                if 2 <= len(name) <= 15:
+                    return name
+
+        # 3) 국민일보 특화/일반 셀렉터 확장
         candidates = []
         for sel in [
-            '.reporter', '.byline', '.writer', '.article-info', '.news-info',
+            '.author', '.reporter', '.byline', '.writer', '.article-info', '.news-info',
             '.writer-name', '.article-writer', '.article_writer', 'span[class*="writer"]',
             'span[class*="name"]', 'div[class*="byline"]', 'em[class*="name"]',
-            # 동아일보 특화 셀렉터
+            # 조선일보 특화 셀렉터
             '.reporter-name', '.reporter_name', '.journalist', '.journalist-name',
             '.byline-name', '.byline_name', '.writer-info', '.writer_info',
-            '.article-meta', '.article_meta', '.news-meta', '.news_meta',
-            '.article_author', '.news_author', '.author_info'
+            '.article-meta', '.article_meta', '.news-meta', '.news_meta'
         ]:
             tag = soup.select_one(sel)
             if tag:
@@ -308,21 +312,21 @@ class UrlArticleCrawler:
         return None
 
     def _extract_content(self, soup: BeautifulSoup) -> Optional[str]:
-        # 동아일보 특화 셀렉터
         selectors = [
-            '.article_body', '.article-body', '.news_body', '.news-body',
-            '.article_content', '.news_content', '.article-text', '.article_text',
-            '.content', '.story-body', '.story_body', '.post-content', '.post_content',
-            '.entry-content', '.entry_content', '.main-content', '.main_content',
-            '.article', 'article', '#article', '.news-article', '.view_body'
+            # 조선일보 특화 셀렉터
+            '#articleBody', '#article-body', '#newsBody', '#CmAdContent',
+            '.article-body', '.news-body', '.news_content', '.news-article',
+            '.article-content', '.view_body', 'article', '.article', '#article',
+            # 조선일보 추가 셀렉터
+            '.article_text', '.article-text', '.content', '.news-content',
+            '.story-body', '.story_body', '.post-content', '.post_content',
+            '.entry-content', '.entry_content', '.main-content', '.main_content'
         ]
-        
         for sel in selectors:
             container = soup.select_one(sel)
             if not container:
                 continue
 
-            # 광고, 스크립트 등 제거
             for unwanted in container.select('script, style, .ad, .advertisement, .banner, .related-articles, .social, .tag, .recommend'):
                 unwanted.decompose()
 
@@ -388,7 +392,6 @@ class UrlArticleCrawler:
                             db_manager.initialize_pool()
                             db_manager.create_tables()
                         db_manager.save_article(data)
-                        logger.info(f"DB 저장 성공: {url}")
                     except Exception as e:
                         logger.warning(f"DB 저장 실패: {e}")
             else:
@@ -398,12 +401,11 @@ class UrlArticleCrawler:
         return results
 
     def _extract_article_links(self, soup: BeautifulSoup, current_url: str) -> List[str]:
-        # 동아일보 기사 링크 패턴 위주로 수집
+        # 조선일보 기사 링크 패턴 위주로 수집
         patterns = [
-            # 동아일보 기사 URL 패턴
-            re.compile(r'/news/\w+/\d{4}/\d{2}/\d{2}/\d+', re.I),
-            re.compile(r'/news/\w+/\d{4}/\d{2}/\d{2}/[A-Z0-9]+', re.I),
-            # 기존 패턴도 유지
+            # 조선일보 기사 URL 패턴 (카테고리/하위카테고리/년/월/일/고유ID)
+            re.compile(r'/[a-z-]+/[a-z_-]+/\d{4}/\d{2}/\d{2}/[A-Z0-9]+/?$', re.I),
+            # 기존 국민일보 패턴도 유지
             re.compile(r'/article/view\.asp\?arcid=\d+', re.I),
             re.compile(r'view\.asp\?arcid=\d+', re.I),
         ]
@@ -414,44 +416,39 @@ class UrlArticleCrawler:
             if not href:
                 continue
                 
-            # 동아일보 도메인 확인
-            if 'donga.com' in href or href.startswith('/'):
+            # 조선일보 도메인 확인
+            if 'chosun.com' in href or href.startswith('/'):
                 for pat in patterns:
                     if pat.search(href):
                         full = self._normalize_url(current_url, href)
                         if full and full not in seen:
-                            # 동아일보 기사 URL인지 추가 검증
-                            if self._is_donga_article_url(full):
+                            # 조선일보 기사 URL인지 추가 검증
+                            if self._is_chosun_article_url(full):
                                 links.append(full)
                                 seen.add(full)
                         break
         return links
 
-    def _is_donga_article_url(self, url: str) -> bool:
-        """동아일보 기사 URL인지 확인"""
+    def _is_chosun_article_url(self, url: str) -> bool:
+        """조선일보 기사 URL인지 확인"""
         try:
             parsed = urlparse(url)
-            if 'donga.com' not in parsed.netloc:
+            if 'chosun.com' not in parsed.netloc:
                 return False
             
             path = parsed.path.strip('/')
             if not path:
                 return False
                 
-            # 동아일보 기사 URL 패턴: news/카테고리/년/월/일/고유ID
-            if path.startswith('news/'):
-                parts = path.split('/')
-                if len(parts) >= 6:
+            # 조선일보 기사 URL 패턴: 카테고리/하위카테고리/년/월/일/고유ID
+            parts = path.split('/')
+            if len(parts) >= 6:
+                # 마지막 부분이 고유ID인지 확인 (대문자+숫자 조합)
+                if re.match(r'^[A-Z0-9]+$', parts[-1]):
                     # 년/월/일 형식 확인
-                    if (re.match(r'^\d{4}$', parts[-3]) and 
-                        re.match(r'^\d{2}$', parts[-2]) and 
-                        re.match(r'^\d{2}$', parts[-1])):
-                        return True
-                    # 또는 마지막 부분이 고유ID인지 확인
-                    elif (re.match(r'^\d{4}$', parts[-4]) and 
-                          re.match(r'^\d{2}$', parts[-3]) and 
-                          re.match(r'^\d{2}$', parts[-2]) and
-                          re.match(r'^[A-Z0-9]+$', parts[-1])):
+                    if (re.match(r'^\d{4}$', parts[-4]) and 
+                        re.match(r'^\d{2}$', parts[-3]) and 
+                        re.match(r'^\d{2}$', parts[-2])):
                         return True
             
             return False
@@ -463,20 +460,19 @@ class UrlArticleCrawler:
             parsed = urlparse(category_url)
             path = parsed.path.lower().strip('/')
             
-            # 동아일보는 경로 기반으로 카테고리를 구분하므로 경로를 우선 분석
+            # 조선일보는 경로 기반으로 카테고리를 구분하므로 경로를 우선 분석
             if path:
-                # 경로 기반 카테고리 매핑 (동아일보 URL 구조)
+                # 경로 기반 카테고리 매핑 (조선일보 URL 구조)
                 path_map = {
-                    'news/opinion': '오피니언',
-                    'news/politics': '정치', 
-                    'news/economy': '경제',
-                    'news/inter': '국제',
-                    'news/society': '사회',
-                    'news/culture': '문화',
-                    'news/entertainment': '연예',
-                    'news/sports': '스포츠',
-                    'news/health': '헬스동아',
-                    'news/trendnews/daily': '트렌드뉴스'
+                    'economy': '경제',
+                    'politics': '정치', 
+                    'national': '사회',
+                    'international': '국제',
+                    'medical': '건강',
+                    'investment': '제테크',
+                    'sports': '스포츠',
+                    'culture-style': '문화/연예',
+                    'opinion': '오피니언',
                 }
                 
                 # 정확한 경로 매칭
@@ -512,6 +508,14 @@ class UrlArticleCrawler:
             }
             if sid1 in sid1_map:
                 return sid1_map[sid1]
+
+            # 기타 특수 경로 처리
+            if 'list_travel.asp' in path:
+                return '여행'
+            if 'list_esports.asp' in path:
+                return 'e스포츠'
+            if 'list_mission.asp' in path:
+                return '더미션'
                 
             # 최종 fallback: 경로의 마지막 부분으로 매핑
             tail = os.path.basename(path).lower()
@@ -523,7 +527,7 @@ class UrlArticleCrawler:
                 'medical': '건강', 'health': '건강',
                 'investment': '제테크', 'jetaek': '제테크',
                 'sports': '스포츠', 'sport': '스포츠', 'spo': '스포츠',
-                'culture': '문화', 'entertainment': '연예',
+                'culture-style': '문화/연예', 'culture': '문화/연예', 'entertainment': '문화/연예',
                 'opinion': '오피니언', 'op': '오피니언',
                 'life': '라이프', 'lif': '라이프',
                 'entertainment': '연예', 'ent': '연예', 'ens': '연예',
@@ -615,9 +619,6 @@ class UrlArticleCrawler:
                             db_manager.create_tables()
                         if db_manager.save_article(data):
                             total_saved += 1
-                            logger.info(f"  - DB 저장 성공: {article_url}")
-                        else:
-                            logger.warning(f"  - DB 저장 실패: {article_url}")
                     except Exception as e:
                         logger.warning(f"DB 저장 실패: {e}")
                 else:
@@ -648,7 +649,7 @@ def _load_urls(args: argparse.Namespace) -> List[str]:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='동아일보 URL 기반 뉴스 기사 크롤러')
+    parser = argparse.ArgumentParser(description='URL 기반 뉴스 기사 크롤러')
     parser.add_argument('--url', action='append', help='크롤링할 URL (여러 번 지정 가능)')
     parser.add_argument('--url-file', type=str, help='URL 목록 파일 경로(줄바꿈 구분)')
     parser.add_argument('--category-url', action='append', help='카테고리 URL (여러 번 지정 가능)')
@@ -675,7 +676,6 @@ def main():
             if not getattr(db_manager, 'connection_pool', None):
                 db_manager.initialize_pool()
                 db_manager.create_tables()
-                logger.info("데이터베이스 연결 및 테이블 생성 완료")
         except Exception as e:
             logger.warning(f'DB 초기화 실패(계속 진행): {e}')
 
@@ -703,7 +703,7 @@ def main():
             crawler.crawl_category_urls(DEFAULT_CATEGORY_URLS, max_pages=max(1, DEFAULT_CATEGORY_PAGES), save_db=save_to_db)
         else:
             if not urls:
-                logger.info('입력된 URL이 없어 기본 동아일보 URL로 실행합니다.')
+                logger.info('입력된 URL이 없어 기본 조선일보 URL로 실행합니다.')
                 urls = list(DEFAULT_URLS)
             results = crawler.crawl_urls(urls, save_db=save_to_db)
 

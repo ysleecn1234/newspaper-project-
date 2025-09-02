@@ -22,7 +22,7 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from choongang_database_manager import db_manager
+    from C_choongang_database_manager import db_manager
     DB_AVAILABLE = True
 except Exception as e:
     logger = logging.getLogger(__name__)

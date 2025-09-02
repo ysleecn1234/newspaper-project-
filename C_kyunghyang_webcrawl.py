@@ -22,7 +22,7 @@ import requests
 from bs4 import BeautifulSoup
 
 try:
-    from kyunghyang_database_manager import db_manager
+    from C_kyunghyang_database_manager import db_manager
 except Exception:
     db_manager = None  # DB가 없어도 동작 가능하게 처리
 
